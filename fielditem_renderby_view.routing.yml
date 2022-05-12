@@ -1,0 +1,7 @@
+fielditem_renderby_view.example:
+  path: '/fielditem-renderby-view/example'
+  defaults:
+    _title: 'Example'
+    _controller: '\Drupal\fielditem_renderby_view\Controller\FielditemRenderbyViewController::build'
+  requirements:
+    _permission: 'access content'

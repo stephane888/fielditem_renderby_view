@@ -1,0 +1,12 @@
+{
+    "name": "stephane888/fielditem_renderby_view",
+    "type": "drupal-module",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "stephane888",
+            "email": "kksasteph888@gmail.com"
+        }
+    ],
+    "require": {}
+}
