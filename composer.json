@@ -1,6 +1,6 @@
 {
     "name": "stephane888/fielditem_renderby_view",
-    "type": "drupal-module",
+    "type": "drupal-module-custom",
     "license": "MIT",
     "authors": [
         {
