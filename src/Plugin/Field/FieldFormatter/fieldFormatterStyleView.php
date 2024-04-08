@@ -4,9 +4,9 @@ namespace Drupal\fielditem_renderby_view\Plugin\Field\FieldFormatter;
 
 use Drupal\Core\Field\FormatterBase;
 use Drupal\Core\Field\FieldItemListInterface;
-use Drupal\Core\Field\Plugin\Field\FieldFormatter\EntityReferenceEntityFormatter;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\views\ViewExecutable;
+use Drupal\views\Views;
 
 /**
  * Plugin implementation of the 'field_example_simple_text' formatter.
@@ -14,114 +14,13 @@ use Drupal\views\ViewExecutable;
  * @FieldFormatter(
  *   id = "fielditem_renderby_view_formatter",
  *   module = "fielditem_renderby_view",
- *   label = @Translation("Rendu via une  view"),
+ *   label = @Translation("Rendu via une view avec filtre contextuel"),
  *   field_types = {
  *     "entity_reference"
  *   }
  * )
  */
-class fieldFormatterStyleView extends EntityReferenceEntityFormatter {
-  
-  /**
-   *
-   * {@inheritdoc}
-   */
-  public function viewElements(FieldItemListInterface $items, $langcode) {
-    $elements = [];
-    $entity_type_id = 'view';
-    $args = [
-      'none'
-    ];
-    if (!$items->isEmpty()) {
-      $args = [];
-      foreach ($items->getValue() as $value) {
-        if (!empty($value['target_id']))
-          $args[] = $value['target_id'];
-      }
-    }
-    $args = implode(",", $args);
-    $currentView = $this->getSetting('view_name');
-    $display_view_id = $this->getSetting('display_view_id');
-    if (!empty($currentView)) {
-      $view = $this->entityTypeManager->getStorage($entity_type_id)->load($currentView);
-      /**
-       *
-       * @var ViewExecutable $viewExecute
-       */
-      $viewExecute = $view->getExecutable();
-      $viewExecute->setDisplay($display_view_id);
-      $viewExecute->setArguments([
-        $args
-      ]);
-      $r = $viewExecute->render($display_view_id);
-      if ($r)
-        return $r;
-    }
-    return $elements;
-  }
-  
-  protected function loadAllViews($reference_field) {
-    $entity_type_id = 'view';
-    $views = $this->entityTypeManager->getStorage($entity_type_id)->loadMultiple();
-    /**
-     * Contient les vues correspondants à l'entity reference.
-     *
-     * @var array $viewsEntity
-     */
-    $viewsEntity = [];
-    foreach ($views as $k => $view) {
-      $base_table = $view->get('base_table');
-      if ($base_table == $reference_field) {
-        $viewsEntity[$k] = $view->label();
-      }
-    }
-    return $viewsEntity;
-  }
-  
-  public function settingsForm(array $form, FormStateInterface $form_state) {
-    $settings = parent::settingsForm($form, $form_state);
-    $settings = $this->getFieldSettings();
-    $options = [];
-    // dump($settings);
-    if (!empty($settings['target_type'])) {
-      $options = $this->loadAllViews($settings['target_type'] . '_field_data');
-    }
-    $currentView = $this->getSetting('view_name');
-    // dump($currentView);
-    $settings['view_name'] = [
-      '#type' => 'select',
-      '#title' => ' Le nom de la vue ',
-      '#default_value' => $currentView,
-      '#options' => $options
-    ];
-    // $settings['view_empty_ids'] = [
-    // '#type' => 'textfield',
-    // '#title' => ' definisez les ids pour les ',
-    // '#default_value' => $currentView,
-    // '#options' => $options
-    // ];
-    /**
-     *
-     * @deprecated, car on ne sait pas faire ajax.
-     */
-    if ($currentView) {
-      $entity_type_id = 'view';
-      $optionsDisplay = [];
-      $view = $this->entityTypeManager->getStorage($entity_type_id)->load($currentView);
-      if (!empty($view)) {
-        foreach ($view->get('display') as $k => $value) {
-          $optionsDisplay[$k] = $value['display_title'];
-        }
-      }
-      $settings['display_view_id'] = [
-        '#type' => 'select',
-        '#title' => ' Le nom de la view ',
-        '#default_value' => $this->getSetting('display_view_id'),
-        '#options' => $optionsDisplay
-      ];
-    }
-    return $settings;
-  }
+class fieldFormatterStyleView extends FormatterBase {
   
   /**
    *
@@ -129,9 +28,152 @@ class fieldFormatterStyleView extends EntityReferenceEntityFormatter {
    */
   public static function defaultSettings() {
     return [
-      'view_name' => '',
-      'display_view_id' => ''
+      'view_name' => null,
+      'display_view_id' => null,
+      'view_arguments' => [],
+      'view_filters' => [],
+      'configure_view' => [
+        'view_name_display' => ''
+      ]
     ] + parent::defaultSettings();
+  }
+  
+  /**
+   *
+   * {@inheritdoc}
+   */
+  public function viewElements(FieldItemListInterface $items, $langcode) {
+    $elements = [];
+    $args = [];
+    $viewId = $this->getSetting('view_name');
+    $display_view_id = $this->getSetting('configure_view.display_view_id') ? $this->getSetting('configure_view.display_view_id') : $this->getSetting('display_view_id');
+    if (!$items->isEmpty()) {
+      foreach ($items->getValue() as $value) {
+        if (!empty($value['target_id']))
+          $args[] = $value['target_id'];
+      }
+      $args = implode(",", $args);
+      $view = Views::getView($viewId);
+      if ($view) {
+        /**
+         *
+         * @var ViewExecutable $viewExecute
+         */
+        $viewExecute = $view->getExecutable();
+        $viewExecute->setDisplay($display_view_id);
+        $viewExecute->setArguments([
+          $args
+        ]);
+        $elements = $viewExecute->render($display_view_id);
+      }
+    }
+    return $elements;
+  }
+  
+  /**
+   *
+   * {@inheritdoc}
+   * @see \Drupal\Core\Field\Plugin\Field\FieldFormatter\EntityReferenceEntityFormatter::settingsForm()
+   */
+  public function settingsForm(array $form, FormStateInterface $form_state) {
+    $elements = parent::settingsForm($form, $form_state);
+    /**
+     * Information de configuration du champs.
+     *
+     * @var array $settings
+     */
+    $settings = $this->getFieldSettings();
+    // \Stephane888\Debug\debugLog::kintDebugDrupal($settings,
+    // 'fieldFormatterStyleView__settingsForm', true);
+    
+    $elements['view_name'] = [
+      '#title' => $this->t(' Select view'),
+      '#type' => 'select',
+      '#options' => $this->getViews(),
+      '#required' => TRUE,
+      '#default_value' => $this->getSetting('view_name'),
+      '#ajax' => [
+        'callback' => self::class . '::SelectViewAndConfigure',
+        'wrapper' => 'creation_site_virtuel_view_name_display_id',
+        'effect' => 'fade'
+      ]
+    ];
+    $elements['configure_view'] = [
+      '#type' => 'details',
+      '#open' => true,
+      '#title' => t('Select display and configure view'),
+      '#attributes' => [
+        'id' => 'creation_site_virtuel_view_name_display_id'
+      ],
+      '#tree' => true
+    ];
+    $view_name_display = $this->getSetting('view_name') ? $this->getSetting('view_name') : $form_state->getValue('view_name');
+    if (!empty($view_name_display)) {
+      $elements['configure_view']['display_view_id'] = [
+        '#title' => $this->t(' Select display '),
+        '#type' => 'select',
+        '#options' => $this->getViewDisplays($view_name_display),
+        '#required' => TRUE,
+        '#default_value' => $this->getSetting('configure_view.display_view_id')
+      ];
+    }
+    return $elements;
+  }
+  
+  /**
+   * On charge toutes les vues.
+   */
+  protected function getViews() {
+    $options = [];
+    $query = \Drupal::entityQuery('view')->condition('status', TRUE)->accessCheck(TRUE);
+    $ids = $query->execute();
+    if ($ids) {
+      $views = \Drupal::entityTypeManager()->getStorage('view')->loadMultiple($ids);
+      
+      foreach ($views as $view) {
+        /**
+         *
+         * @var \Drupal\views\Entity\View $view
+         */
+        // if ($view->id() == 'clothings') {
+        // $viewExecutable = $view->getExecutable();
+        // \Stephane888\Debug\debugLog::$max_depth = 5;
+        // \Stephane888\Debug\debugLog::kintDebugDrupal($viewExecutable,
+        // 'getViews', true);
+        // }
+        // il faudra touver le moyen de charger uniquement les views
+        // contextuels.
+        $options[$view->id()] = $view->label();
+      }
+    }
+    return $options;
+  }
+  
+  protected function getViewDisplays($view_name) {
+    $options = [];
+    /**
+     *
+     * @var \Drupal\views\ViewExecutable $View
+     */
+    $View = Views::getView($view_name);
+    if ($View) {
+      $displays = $View->storage->get('display');
+      foreach ($displays as $display_id => $v) {
+        // $View->setDisplay($display_id);
+        $options[$display_id] = $v['display_title'];
+      }
+    }
+    return $options;
+  }
+  
+  /**
+   *
+   * @param array $form
+   * @param FormStateInterface $form_state
+   * @return array
+   */
+  public static function SelectViewAndConfigure($form, FormStateInterface $form_state) {
+    return $form['settings']['formatter']['settings_wrapper']['settings']['configure_view'];
   }
   
 }
