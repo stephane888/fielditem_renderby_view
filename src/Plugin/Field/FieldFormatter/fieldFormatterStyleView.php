@@ -33,7 +33,7 @@ class fieldFormatterStyleView extends FormatterBase {
       'view_arguments' => [],
       'view_filters' => [],
       'configure_view' => [
-        'view_name_display' => ''
+        'display_view_id' => null
       ]
     ] + parent::defaultSettings();
   }
@@ -46,21 +46,23 @@ class fieldFormatterStyleView extends FormatterBase {
     $elements = [];
     $args = [];
     $viewId = $this->getSetting('view_name');
-    $display_view_id = $this->getSetting('configure_view.display_view_id') ? $this->getSetting('configure_view.display_view_id') : $this->getSetting('display_view_id');
+    $configure_view = $this->getSetting('configure_view');
+    $display_view_id = !empty($configure_view['display_view_id']) ? $configure_view['display_view_id'] : $this->getSetting('display_view_id');
+    
     if (!$items->isEmpty()) {
       foreach ($items->getValue() as $value) {
         if (!empty($value['target_id']))
           $args[] = $value['target_id'];
       }
       $args = implode(",", $args);
-      $view = Views::getView($viewId);
-      if ($view) {
-        /**
-         *
-         * @var ViewExecutable $viewExecute
-         */
-        $viewExecute = $view->getExecutable();
+      /**
+       *
+       * @var \Drupal\views\ViewExecutable $viewExecute
+       */
+      $viewExecute = Views::getView($viewId);
+      if ($viewExecute) {
         $viewExecute->setDisplay($display_view_id);
+        $viewExecute->initHandlers();
         $viewExecute->setArguments([
           $args
         ]);
@@ -109,12 +111,13 @@ class fieldFormatterStyleView extends FormatterBase {
     ];
     $view_name_display = $this->getSetting('view_name') ? $this->getSetting('view_name') : $form_state->getValue('view_name');
     if (!empty($view_name_display)) {
+      $configure_view = $this->getSetting('configure_view');
       $elements['configure_view']['display_view_id'] = [
         '#title' => $this->t(' Select display '),
         '#type' => 'select',
         '#options' => $this->getViewDisplays($view_name_display),
         '#required' => TRUE,
-        '#default_value' => $this->getSetting('configure_view.display_view_id')
+        '#default_value' => $configure_view['display_view_id']
       ];
     }
     return $elements;
