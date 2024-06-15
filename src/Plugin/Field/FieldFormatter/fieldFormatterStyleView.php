@@ -16,7 +16,8 @@ use Drupal\views\Views;
  *   module = "fielditem_renderby_view",
  *   label = @Translation("Rendu via une view avec filtre contextuel"),
  *   field_types = {
- *     "entity_reference"
+ *     "entity_reference",
+ *     "entity_reference_revisions"
  *   }
  * )
  */
@@ -44,12 +45,11 @@ class fieldFormatterStyleView extends FormatterBase {
    */
   public function viewElements(FieldItemListInterface $items, $langcode) {
     $elements = [];
-    $args = [];
-    $viewId = $this->getSetting('view_name');
-    $configure_view = $this->getSetting('configure_view');
-    $display_view_id = !empty($configure_view['display_view_id']) ? $configure_view['display_view_id'] : $this->getSetting('display_view_id');
-    
     if (!$items->isEmpty()) {
+      $args = [];
+      $viewId = $this->getSetting('view_name');
+      $configure_view = $this->getSetting('configure_view');
+      $display_view_id = !empty($configure_view['display_view_id']) ? $configure_view['display_view_id'] : $this->getSetting('display_view_id');
       foreach ($items->getValue() as $value) {
         if (!empty($value['target_id']))
           $args[] = $value['target_id'];
@@ -178,5 +178,4 @@ class fieldFormatterStyleView extends FormatterBase {
   public static function SelectViewAndConfigure($form, FormStateInterface $form_state) {
     return $form['settings']['formatter']['settings_wrapper']['settings']['configure_view'];
   }
-  
 }
