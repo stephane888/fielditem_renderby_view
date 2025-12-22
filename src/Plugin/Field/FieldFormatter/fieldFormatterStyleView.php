@@ -5,7 +5,7 @@ namespace Drupal\fielditem_renderby_view\Plugin\Field\FieldFormatter;
 use Drupal\Core\Field\FormatterBase;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\views\ViewExecutable;
+use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\views\Views;
 
 /**
@@ -38,7 +38,6 @@ class fieldFormatterStyleView extends FormatterBase {
       ]
     ] + parent::defaultSettings();
   }
-  
   
   /**
    *
@@ -218,3 +217,4 @@ class fieldFormatterStyleView extends FormatterBase {
     return $form['settings']['formatter']['settings_wrapper']['settings']['configure_view'];
   }
 }
+
