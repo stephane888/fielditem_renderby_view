@@ -138,47 +138,72 @@ class fieldFormatterStyleView extends FormatterBase {
   }
   
   /**
-   * On charge toutes les vues.
+   * Retourne la liste des vues actives ayant au moins un filtre contextuel.
+   *
+   * @return array Tableau [view_id => label]
    */
   protected function getViews() {
     $options = [];
-    $query = \Drupal::entityQuery('view')->condition('status', TRUE)->accessCheck(TRUE);
-    $ids = $query->execute();
-    if ($ids) {
-      $views = \Drupal::entityTypeManager()->getStorage('view')->loadMultiple($ids);
-      
-      foreach ($views as $view) {
-        /**
-         *
-         * @var \Drupal\views\Entity\View $view
-         */
-        // if ($view->id() == 'clothings') {
-        // $viewExecutable = $view->getExecutable();
-        // \Stephane888\Debug\debugLog::$max_depth = 5;
-        // \Stephane888\Debug\debugLog::kintDebugDrupal($viewExecutable,
-        // 'getViews', true);
-        // }
-        // il faudra touver le moyen de charger uniquement les views
-        // contextuels.
-        $options[$view->id()] = $view->label();
+    // Charger uniquement les vues actives
+    $ids = \Drupal::entityQuery('view')->condition('status', TRUE)->accessCheck(TRUE)->execute();
+    if (!$ids)
+      return $options;
+    
+    /** @var \Drupal\views\Entity\View[] $views */
+    $views = \Drupal::entityTypeManager()->getStorage('view')->loadMultiple($ids);
+    foreach ($views as $view) {
+      $displays = $view->get('display');
+      if (empty($displays)) {
+        continue;
+      }
+      // Vérifie chaque display
+      foreach ($displays as $display) {
+        if (!empty($display['display_options']['arguments']) && is_array($display['display_options']['arguments'])) {
+          $options[$view->id()] = $view->label();
+          break;
+        }
       }
     }
     return $options;
   }
   
+  /**
+   * Retourne les displays d'une view qui ont des filtres contextuels.
+   *
+   * @param string $view_name
+   *        ID de la view.
+   *        
+   * @return array Tableau [display_id => display_title]
+   */
   protected function getViewDisplays($view_name) {
     $options = [];
     /**
      *
      * @var \Drupal\views\ViewExecutable $View
      */
-    $View = Views::getView($view_name);
-    if ($View) {
-      $displays = $View->storage->get('display');
-      foreach ($displays as $display_id => $v) {
-        // $View->setDisplay($display_id);
-        $options[$display_id] = $v['display_title'];
-      }
+    $view = Views::getView($view_name);
+    if (!$view)
+      return $options;
+    /**
+     *
+     * @var \Drupal\views\Entity\View $viewdff
+     */
+    $viewdff = $view->storage;
+    $displays = $view->storage->get('display');
+    if (empty($displays))
+      return $options;
+    foreach ($displays as $display_id => $display) {
+      if (!empty($display['disabled']))
+        continue;
+      /**
+       * Pour bien gerer cette partie il faut distinguer le cas ou la vue est
+       * surcharger ou pas.
+       */
+      // if (!empty($display['display_options']['arguments'])) {
+      // $options[$display_id] = $display['display_title'];
+      // }
+      // @todo en attente, on met tous les affichages.
+      $options[$display_id] = $display['display_title'];
     }
     return $options;
   }
