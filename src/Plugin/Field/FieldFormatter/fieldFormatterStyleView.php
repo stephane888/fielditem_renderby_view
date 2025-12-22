@@ -39,36 +39,50 @@ class fieldFormatterStyleView extends FormatterBase {
     ] + parent::defaultSettings();
   }
   
+  
   /**
    *
    * {@inheritdoc}
    */
   public function viewElements(FieldItemListInterface $items, $langcode) {
     $elements = [];
-    if (!$items->isEmpty()) {
-      $args = [];
-      $viewId = $this->getSetting('view_name');
-      $configure_view = $this->getSetting('configure_view');
-      $display_view_id = !empty($configure_view['display_view_id']) ? $configure_view['display_view_id'] : $this->getSetting('display_view_id');
-      foreach ($items->getValue() as $value) {
-        if (!empty($value['target_id']))
-          $args[] = $value['target_id'];
-      }
-      $args = implode(",", $args);
-      /**
-       *
-       * @var \Drupal\views\ViewExecutable $viewExecute
-       */
-      $viewExecute = Views::getView($viewId);
-      if ($viewExecute) {
-        $viewExecute->setDisplay($display_view_id);
-        $viewExecute->initHandlers();
-        $viewExecute->setArguments([
-          $args
-        ]);
-        $elements = $viewExecute->render($display_view_id);
-      }
+    if ($items->isEmpty())
+      return $elements;
+    $args = [];
+    $viewId = $this->getSetting('view_name');
+    $configure_view = $this->getSetting('configure_view');
+    $display_view_id = !empty($configure_view['display_view_id']) ? $configure_view['display_view_id'] : $this->getSetting('display_view_id');
+    foreach ($items->getValue() as $value) {
+      if (!empty($value['target_id']))
+        $args[] = $value['target_id'];
     }
+    if (!$args)
+      return $elements;
+    $args = implode(",", $args);
+    /**
+     *
+     * @var \Drupal\views\ViewExecutable $viewExecute
+     */
+    $viewExecute = Views::getView($viewId);
+    // Si la vue existe et que l'utilisateur a acces.
+    if (!$viewExecute || !$viewExecute->access($display_view_id))
+      return $elements;
+    $viewExecute->setDisplay($display_view_id);
+    $viewExecute->setArguments([
+      $args
+    ]);
+    $viewExecute->preExecute();
+    $build = $viewExecute->render();
+    
+    // Recupere l'entité qui porte les references.
+    $parent_entity = $items->getEntity();
+    // On ajoute le cache en fonction de l'entité parente.
+    $cacheability = CacheableMetadata::createFromRenderArray($build);
+    $cacheability->addCacheableDependency($parent_entity);
+    $cacheability->applyTo($build);
+    
+    // Ajout au rendu du champ
+    $elements = $build;
     return $elements;
   }
   
